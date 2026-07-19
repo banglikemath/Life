@@ -4,12 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>LIFE Dashboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script> src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script> src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <style>
   :root{
     --bg:#0b0f0c;
@@ -66,38 +63,70 @@
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel" data-presets="react">
-const { useState, useEffect, useMemo, useRef } = React;
+<div id="root"></div><div id="__err" style="display:none;padding:20px;font-family:sans-serif;color:#e8f0e6;background:#0b0f0c;min-height:100vh"><h3 style="color:#7fd858">Falha ao carregar</h3><p id="__errmsg" style="color:#9db8a4;font-size:14px"></p><button onclick="location.reload()" style="background:#7fd858;color:#0b0f0c;border:0;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600">Recarregar</button></div>
+<script>window.addEventListener("error",function(e){var b=document.getElementById("__err");if(b){b.style.display="block";document.getElementById("__errmsg").textContent=(e.message||"")+" — verifique a conexao e recarregue.";}});setTimeout(function(){if(typeof React==="undefined"){var b=document.getElementById("__err");if(b){b.style.display="block";document.getElementById("__errmsg").textContent="React nao carregou. Tente outra rede.";}}},5000);</script>
+<script>
+const {
+  useState,
+  useEffect,
+  useMemo,
+  useRef
+} = React;
 
 /* ============ CONFIG ============ */
 // Cole aqui a URL do seu Web App após publicar o Code.gs (Implantar > App da Web)
 const API_URL = ""; // ex: "https://script.google.com/macros/s/AKfy.../exec"
 const LS_KEY = "life_dashboard_v1";
-
-const CATEGORIAS = [
-  { nome: "Lazer e Música", emoji: "🎻" },
-  { nome: "Estudos", emoji: "📚" },
-  { nome: "Trabalho e Consultoria", emoji: "💼" },
-  { nome: "Bem-estar e Espiritualidade", emoji: "🌿" },
-  { nome: "Casa e Rotina", emoji: "🏠" },
-  { nome: "Treinos", emoji: "💪" },
-];
+const CATEGORIAS = [{
+  nome: "Lazer e Música",
+  emoji: "🎻"
+}, {
+  nome: "Estudos",
+  emoji: "📚"
+}, {
+  nome: "Trabalho e Consultoria",
+  emoji: "💼"
+}, {
+  nome: "Bem-estar e Espiritualidade",
+  emoji: "🌿"
+}, {
+  nome: "Casa e Rotina",
+  emoji: "🏠"
+}, {
+  nome: "Treinos",
+  emoji: "💪"
+}];
 
 /* ============ HELPERS ============ */
 const uid = () => Math.random().toString(36).slice(2, 9);
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const isoWeek = (d) => {
-  const dt = new Date(d); dt.setHours(0,0,0,0);
-  dt.setDate(dt.getDate() + 3 - ((dt.getDay() + 6) % 7));
+const isoWeek = d => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
   const wk1 = new Date(dt.getFullYear(), 0, 4);
-  return dt.getFullYear() + "-" + (1 + Math.round(((dt - wk1) / 86400000 - 3 + ((wk1.getDay() + 6) % 7)) / 7));
+  return dt.getFullYear() + "-" + (1 + Math.round(((dt - wk1) / 86400000 - 3 + (wk1.getDay() + 6) % 7) / 7));
 };
-const daysSince = (iso) => {
+const daysSince = iso => {
   if (!iso) return null;
   const diff = Date.now() - new Date(iso).getTime();
   return Math.floor(diff / 86400000);
 };
+// Progresso por passadas: soma passadas feitas / soma das metas
+const progressoPassadas = etapas => {
+  let feitas = 0,
+    total = 0;
+  etapas.forEach(e => {
+    total += e.meta || 1;
+    feitas += Math.min(e.passadas || 0, e.meta || 1);
+  });
+  return {
+    feitas,
+    total: total || 1,
+    pct: total ? Math.round(feitas / total * 100) : 0
+  };
+};
+const DEFAULT_META = 3;
 
 // Estrutura em memória: lista de projetos, cada um com etapas.
 // Persistência: no Sheets é 1 linha por etapa; aqui agrupamos.
@@ -107,18 +136,29 @@ function rowsToProjects(rows) {
     const key = r.projeto + "||" + r.tipo;
     if (!map[key]) {
       map[key] = {
-        projeto: r.projeto, categoria: r.categoria, emoji: r.emoji,
-        tipo: r.tipo || "Projeto", rotinaFreq: r.rotinaFreq || "Diaria",
-        favorito: !!r.favorito, ultimoAvanco: r.ultimoAvanco || "",
+        projeto: r.projeto,
+        categoria: r.categoria,
+        emoji: r.emoji,
+        tipo: r.tipo || "Projeto",
+        rotinaFreq: r.rotinaFreq || "Diaria",
+        favorito: !!r.favorito,
+        ultimoAvanco: r.ultimoAvanco || "",
         etapas: []
       };
     }
     map[key].favorito = map[key].favorito || !!r.favorito;
     if (r.ultimoAvanco > map[key].ultimoAvanco) map[key].ultimoAvanco = r.ultimoAvanco;
-    map[key].etapas.push({ id: r.id || uid(), texto: r.etapa, ordem: r.ordem || 0, concluida: !!r.concluida });
+    map[key].etapas.push({
+      id: r.id || uid(),
+      texto: r.etapa,
+      ordem: r.ordem || 0,
+      meta: r.meta || DEFAULT_META,
+      passadas: r.passadas || 0,
+      concluida: !!r.concluida
+    });
   });
   return Object.values(map).map(p => {
-    p.etapas.sort((a,b) => a.ordem - b.ordem);
+    p.etapas.sort((a, b) => a.ordem - b.ordem);
     return p;
   });
 }
@@ -126,26 +166,49 @@ function projectsToRows(projects) {
   const rows = [];
   projects.forEach(p => {
     if (!p.etapas.length) {
-      rows.push({ id: uid(), categoria: p.categoria, projeto: p.projeto, emoji: p.emoji,
-        tipo: p.tipo, rotinaFreq: p.rotinaFreq, etapa: "", ordem: 0,
-        concluida: false, favorito: p.favorito, ultimoAvanco: p.ultimoAvanco });
+      rows.push({
+        id: uid(),
+        categoria: p.categoria,
+        projeto: p.projeto,
+        emoji: p.emoji,
+        tipo: p.tipo,
+        rotinaFreq: p.rotinaFreq,
+        etapa: "",
+        ordem: 0,
+        concluida: false,
+        favorito: p.favorito,
+        ultimoAvanco: p.ultimoAvanco
+      });
       return;
     }
     p.etapas.forEach((e, i) => {
-      rows.push({ id: e.id, categoria: p.categoria, projeto: p.projeto, emoji: p.emoji,
-        tipo: p.tipo, rotinaFreq: p.rotinaFreq, etapa: e.texto, ordem: i,
-        concluida: e.concluida, favorito: p.favorito, ultimoAvanco: p.ultimoAvanco });
+      rows.push({
+        id: e.id,
+        categoria: p.categoria,
+        projeto: p.projeto,
+        emoji: p.emoji,
+        tipo: p.tipo,
+        rotinaFreq: p.rotinaFreq,
+        etapa: e.texto,
+        ordem: i,
+        meta: e.meta || DEFAULT_META,
+        passadas: e.passadas || 0,
+        concluida: e.concluida,
+        favorito: p.favorito,
+        ultimoAvanco: p.ultimoAvanco
+      });
     });
   });
   return rows;
 }
-
 async function apiCall(payload) {
   if (!API_URL) throw new Error("no-api");
   const res = await fetch(API_URL, {
     method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(payload)
   });
   return res.json();
 }
@@ -165,7 +228,7 @@ function App() {
       try {
         const data = JSON.parse(raw);
         setProjects(resetRotinas(data.projects || []));
-      } catch(e) {}
+      } catch (e) {}
     }
     setLoaded(true);
   }, []);
@@ -173,7 +236,10 @@ function App() {
   // Salva local a cada mudança
   useEffect(() => {
     if (!loaded) return;
-    localStorage.setItem(LS_KEY, JSON.stringify({ projects, savedAt: Date.now() }));
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      projects,
+      savedAt: Date.now()
+    }));
     dirty.current = true;
   }, [projects, loaded]);
 
@@ -181,48 +247,86 @@ function App() {
   function resetRotinas(list) {
     return list.map(p => {
       if (p.tipo !== "Rotina") return p;
-      const stale = p.rotinaFreq === "Semanal"
-        ? isoWeek(p.ultimoAvanco) !== isoWeek(todayISO())
-        : p.ultimoAvanco !== todayISO();
+      const stale = p.rotinaFreq === "Semanal" ? isoWeek(p.ultimoAvanco) !== isoWeek(todayISO()) : p.ultimoAvanco !== todayISO();
       if (stale && p.etapas[0]) {
-        return { ...p, etapas: [{ ...p.etapas[0], concluida: false }] };
+        return {
+          ...p,
+          etapas: [{
+            ...p.etapas[0],
+            concluida: false
+          }]
+        };
       }
       return p;
     });
   }
-
   const projetos = useMemo(() => projects.filter(p => p.tipo === "Projeto"), [projects]);
-  const rotinas  = useMemo(() => projects.filter(p => p.tipo === "Rotina"), [projects]);
+  const rotinas = useMemo(() => projects.filter(p => p.tipo === "Rotina"), [projects]);
   const favoritos = useMemo(() => projetos.filter(p => p.favorito), [projetos]);
-
   const porCategoria = useMemo(() => {
     const g = {};
-    projetos.forEach(p => { (g[p.categoria] = g[p.categoria] || []).push(p); });
+    projetos.forEach(p => {
+      (g[p.categoria] = g[p.categoria] || []).push(p);
+    });
     return g;
   }, [projetos]);
-
   function setProject(target, patch) {
-    setProjects(prev => prev.map(p => p === target ? { ...p, ...patch } : p));
+    setProjects(prev => prev.map(p => p === target ? {
+      ...p,
+      ...patch
+    } : p));
   }
   function removeProject(target) {
     setProjects(prev => prev.filter(p => p !== target));
   }
 
-  // Avançar: marca a primeira etapa não concluída
+  // +1 passada na etapa atual; fecha a etapa ao atingir a meta de repetições
   function avancar(target) {
     setProjects(prev => prev.map(p => {
       if (p !== target) return p;
       const etapas = [...p.etapas];
       const next = etapas.findIndex(e => !e.concluida);
-      if (next >= 0) etapas[next] = { ...etapas[next], concluida: true };
-      return { ...p, etapas, ultimoAvanco: todayISO() };
+      if (next >= 0) {
+        const e = etapas[next];
+        const meta = e.meta || 1;
+        const passadas = Math.min((e.passadas || 0) + 1, meta);
+        etapas[next] = {
+          ...e,
+          passadas,
+          concluida: passadas >= meta
+        };
+      }
+      return {
+        ...p,
+        etapas,
+        ultimoAvanco: todayISO()
+      };
     }));
   }
+  // Clique numa etapa: -1 passada (corrige toque errado) ou reabre se concluída
   function toggleEtapa(target, etapaId) {
     setProjects(prev => prev.map(p => {
       if (p !== target) return p;
-      const etapas = p.etapas.map(e => e.id === etapaId ? { ...e, concluida: !e.concluida } : e);
-      return { ...p, etapas, ultimoAvanco: todayISO() };
+      const etapas = p.etapas.map(e => {
+        if (e.id !== etapaId) return e;
+        const meta = e.meta || 1;
+        if (e.concluida) return {
+          ...e,
+          concluida: false,
+          passadas: Math.max(0, meta - 1)
+        };
+        const passadas = Math.max(0, (e.passadas || 0) - 1);
+        return {
+          ...e,
+          passadas,
+          concluida: false
+        };
+      });
+      return {
+        ...p,
+        etapas,
+        ultimoAvanco: todayISO()
+      };
     }));
   }
   function toggleFav(target) {
@@ -230,31 +334,41 @@ function App() {
     if (!target.favorito && favCount >= 3) {
       if (!confirm("Você já tem 3 no Foco Agora. Foco demais = foco nenhum 😅. Adicionar mesmo assim?")) return;
     }
-    setProject(target, { favorito: !target.favorito });
+    setProject(target, {
+      favorito: !target.favorito
+    });
   }
   function toggleRotina(target) {
     setProjects(prev => prev.map(p => {
       if (p !== target) return p;
       const done = p.etapas[0] && p.etapas[0].concluida;
-      return { ...p, etapas: [{ id: p.etapas[0] ? p.etapas[0].id : uid(), texto: p.projeto, ordem: 0, concluida: !done }],
-        ultimoAvanco: !done ? todayISO() : p.ultimoAvanco };
+      return {
+        ...p,
+        etapas: [{
+          id: p.etapas[0] ? p.etapas[0].id : uid(),
+          texto: p.projeto,
+          ordem: 0,
+          concluida: !done
+        }],
+        ultimoAvanco: !done ? todayISO() : p.ultimoAvanco
+      };
     }));
   }
-
   function saveEdited(proj, isNew) {
-    if (isNew) setProjects(prev => [...prev, proj]);
-    else setProjects(prev => prev.map(p => p === editing.ref ? proj : p));
+    if (isNew) setProjects(prev => [...prev, proj]);else setProjects(prev => prev.map(p => p === editing.ref ? proj : p));
     setEditing(null);
   }
-
   async function sync() {
     setSyncState("saving");
     try {
-      await apiCall({ action: "sync", rows: projectsToRows(projects) });
+      await apiCall({
+        action: "sync",
+        rows: projectsToRows(projects)
+      });
       setSyncState("ok");
       dirty.current = false;
       setTimeout(() => setSyncState("idle"), 2000);
-    } catch(e) {
+    } catch (e) {
       setSyncState(e.message === "no-api" ? "noapi" : "err");
       setTimeout(() => setSyncState("idle"), 3500);
     }
@@ -262,327 +376,811 @@ function App() {
   async function pull() {
     setSyncState("saving");
     try {
-      const r = await apiCall({ action: "getAll" });
+      const r = await apiCall({
+        action: "getAll"
+      });
       if (r.ok) {
         setProjects(resetRotinas(rowsToProjects(r.rows)));
         setSyncState("ok");
         setTimeout(() => setSyncState("idle"), 2000);
       } else throw new Error(r.error);
-    } catch(e) {
+    } catch (e) {
       setSyncState(e.message === "no-api" ? "noapi" : "err");
       setTimeout(() => setSyncState("idle"), 3500);
     }
   }
-
   if (!loaded) return null;
-
-  return (
-    <div className="wrap">
-      <Header syncState={syncState} onSync={sync} onPull={pull} hasApi={!!API_URL} />
-
-      {favoritos.length > 0 && <FocusBand favoritos={favoritos} />}
-
-      <div className="row" style={{justifyContent:"space-between",margin:"22px 0 12px"}}>
-        <div className="row" style={{gap:8}}>
-          <span style={{fontSize:16,fontWeight:600}}>Projetos</span>
-          <span style={{fontSize:12,color:"var(--text-3)"}}>{projetos.length}</span>
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setEditing({ ref:"new", tipo:"Projeto" })}>+ Novo projeto</button>
-      </div>
-
-      {projetos.length === 0 && (
-        <EmptyState onAdd={() => setEditing({ ref:"new", tipo:"Projeto" })} />
-      )}
-
-      {CATEGORIAS.filter(c => porCategoria[c.nome]).map(c => (
-        <CategoriaBloco key={c.nome} cat={c} projetos={porCategoria[c.nome]}
-          onAvancar={avancar} onToggleEtapa={toggleEtapa} onFav={toggleFav}
-          onEdit={p => setEditing({ ref:p, ...p })} onRemove={removeProject} />
-      ))}
-
-      <RotinasFooter rotinas={rotinas} onToggle={toggleRotina}
-        onAdd={() => setEditing({ ref:"new", tipo:"Rotina" })} onRemove={removeProject} />
-
-      {editing && (
-        <EditorModal editing={editing} onClose={() => setEditing(null)} onSave={saveEdited} />
-      )}
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "wrap"
+  }, /*#__PURE__*/React.createElement(Header, {
+    syncState: syncState,
+    onSync: sync,
+    onPull: pull,
+    hasApi: !!API_URL
+  }), favoritos.length > 0 && /*#__PURE__*/React.createElement(FocusBand, {
+    favoritos: favoritos
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between",
+      margin: "22px 0 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 600
+    }
+  }, "Projetos"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-3)"
+    }
+  }, projetos.length)), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: () => setEditing({
+      ref: "new",
+      tipo: "Projeto"
+    })
+  }, "+ Novo projeto")), projetos.length === 0 && /*#__PURE__*/React.createElement(EmptyState, {
+    onAdd: () => setEditing({
+      ref: "new",
+      tipo: "Projeto"
+    })
+  }), CATEGORIAS.filter(c => porCategoria[c.nome]).map(c => /*#__PURE__*/React.createElement(CategoriaBloco, {
+    key: c.nome,
+    cat: c,
+    projetos: porCategoria[c.nome],
+    onAvancar: avancar,
+    onToggleEtapa: toggleEtapa,
+    onFav: toggleFav,
+    onEdit: p => setEditing({
+      ref: p,
+      ...p
+    }),
+    onRemove: removeProject
+  })), /*#__PURE__*/React.createElement(RotinasFooter, {
+    rotinas: rotinas,
+    onToggle: toggleRotina,
+    onAdd: () => setEditing({
+      ref: "new",
+      tipo: "Rotina"
+    }),
+    onRemove: removeProject
+  }), editing && /*#__PURE__*/React.createElement(EditorModal, {
+    editing: editing,
+    onClose: () => setEditing(null),
+    onSave: saveEdited
+  }));
 }
-
-function Header({ syncState, onSync, onPull, hasApi }) {
-  const label = { idle:"Sincronizar", saving:"Sincronizando…", ok:"Sincronizado ✓", err:"Erro ✕", noapi:"Configure a API" }[syncState];
-  return (
-    <div className="row" style={{justifyContent:"space-between"}}>
-      <div className="row" style={{gap:9}}>
-        <span style={{fontSize:22}}>🌱</span>
-        <div>
-          <div style={{fontSize:19,fontWeight:700,letterSpacing:"-.02em"}}>LIFE Dashboard</div>
-          <div style={{fontSize:11,color:"var(--text-3)"}}>onde você parou, e o próximo passo</div>
-        </div>
-      </div>
-      <div className="row" style={{gap:6}}>
-        {hasApi && <button className="btn btn-ghost btn-sm" onClick={onPull} title="Puxar do Sheets">↓</button>}
-        <button className="btn btn-sm" onClick={onSync}
-          style={syncState==="ok"?{borderColor:"var(--lime)",color:"var(--lime)"}:syncState==="err"?{borderColor:"var(--danger)",color:"var(--danger)"}:{}}>
-          {label}
-        </button>
-      </div>
-    </div>
-  );
+function Header({
+  syncState,
+  onSync,
+  onPull,
+  hasApi
+}) {
+  const label = {
+    idle: "Sincronizar",
+    saving: "Sincronizando…",
+    ok: "Sincronizado ✓",
+    err: "Erro ✕",
+    noapi: "Configure a API"
+  }[syncState];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 9
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 22
+    }
+  }, "🌱"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 19,
+      fontWeight: 700,
+      letterSpacing: "-.02em"
+    }
+  }, "LIFE Dashboard"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-3)"
+    }
+  }, "onde você parou, e o próximo passo"))), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 6
+    }
+  }, hasApi && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: onPull,
+    title: "Puxar do Sheets"
+  }, "↓"), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: onSync,
+    style: syncState === "ok" ? {
+      borderColor: "var(--lime)",
+      color: "var(--lime)"
+    } : syncState === "err" ? {
+      borderColor: "var(--danger)",
+      color: "var(--danger)"
+    } : {}
+  }, label)));
 }
-
-function FocusBand({ favoritos }) {
-  return (
-    <div style={{background:"var(--lime-soft)",border:"1px solid #7fd85830",borderRadius:14,padding:14,marginTop:18}}>
-      <div className="row" style={{gap:6,marginBottom:11}}>
-        <span style={{fontSize:15}}>🔥</span>
-        <span style={{fontSize:13,fontWeight:600,color:"var(--lime)"}}>Foco agora</span>
-      </div>
-      <div className="focus-scroll">
-        {favoritos.map((p,i) => {
-          const next = p.etapas.find(e => !e.concluida);
-          const done = p.etapas.filter(e => e.concluida).length;
-          const total = p.etapas.length || 1;
-          return (
-            <div key={i} className="focus-card fade" style={{minWidth:190,background:"var(--card)",borderRadius:11,padding:13,border:"1px solid var(--border)"}}>
-              <div className="row" style={{justifyContent:"space-between",marginBottom:9}}>
-                <span style={{fontSize:12,color:"var(--text-2)"}}>{p.emoji} {p.projeto}</span>
-                <span style={{color:"var(--warn)"}}>★</span>
-              </div>
-              <div style={{fontSize:11,color:"var(--text-3)",marginBottom:3}}>Próximo passo</div>
-              <div style={{fontSize:14,fontWeight:600,marginBottom:11,minHeight:38,lineHeight:1.3}}>
-                {next ? next.texto : "🎉 Trilha concluída!"}
-              </div>
-              <div className="row" style={{gap:6}}>
-                <div style={{flex:1,height:5,background:"var(--border-strong)",borderRadius:3,overflow:"hidden"}}>
-                  <div style={{width:(done/total*100)+"%",height:"100%",background:"var(--lime)"}}></div>
-                </div>
-                <span style={{fontSize:10,color:"var(--text-3)"}}>{done}/{total}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+function FocusBand({
+  favoritos
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--lime-soft)",
+      border: "1px solid #7fd85830",
+      borderRadius: 14,
+      padding: 14,
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 6,
+      marginBottom: 11
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 15
+    }
+  }, "🔥"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: "var(--lime)"
+    }
+  }, "Foco agora")), /*#__PURE__*/React.createElement("div", {
+    className: "focus-scroll"
+  }, favoritos.map((p, i) => {
+    const next = p.etapas.find(e => !e.concluida);
+    const prog = progressoPassadas(p.etapas);
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      className: "focus-card fade",
+      style: {
+        minWidth: 190,
+        background: "var(--card)",
+        borderRadius: 11,
+        padding: 13,
+        border: "1px solid var(--border)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "row",
+      style: {
+        justifyContent: "space-between",
+        marginBottom: 9
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "var(--text-2)"
+      }
+    }, p.emoji, " ", p.projeto), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "var(--warn)"
+      }
+    }, "★")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "var(--text-3)",
+        marginBottom: 3
+      }
+    }, "Próximo passo"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 14,
+        fontWeight: 600,
+        marginBottom: 6,
+        minHeight: 38,
+        lineHeight: 1.3
+      }
+    }, next ? next.texto : "🎉 Trilha concluída!"), next && (next.meta || 1) > 1 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "var(--lime)",
+        marginBottom: 7
+      }
+    }, "●".repeat(next.passadas || 0), "○".repeat(Math.max(0, (next.meta || 1) - (next.passadas || 0))), " passada ", next.passadas || 0, "/", next.meta || 1), /*#__PURE__*/React.createElement("div", {
+      className: "row",
+      style: {
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 5,
+        background: "var(--border-strong)",
+        borderRadius: 3,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: prog.pct + "%",
+        height: "100%",
+        background: "var(--lime)"
+      }
+    })), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-3)"
+      }
+    }, prog.pct, "%")));
+  })));
 }
-
 function statusBadge(p) {
   const d = daysSince(p.ultimoAvanco);
   const allDone = p.etapas.length && p.etapas.every(e => e.concluida);
-  if (allDone) return { txt:"✓ concluído", bg:"var(--lime-soft)", c:"var(--lime)" };
+  if (allDone) return {
+    txt: "✓ concluído",
+    bg: "var(--lime-soft)",
+    c: "var(--lime)"
+  };
   if (d === null) return null;
-  if (d === 0) return { txt:"avançou hoje", bg:"var(--lime-soft)", c:"var(--lime)" };
-  if (d === 1) return { txt:"avançou ontem", bg:"var(--lime-soft)", c:"var(--lime)" };
-  if (d >= 5) return { txt:`parado há ${d} dias`, bg:"var(--warn-soft)", c:"var(--warn)" };
-  return { txt:`há ${d} dias`, bg:"transparent", c:"var(--text-3)" };
+  if (d === 0) return {
+    txt: "avançou hoje",
+    bg: "var(--lime-soft)",
+    c: "var(--lime)"
+  };
+  if (d === 1) return {
+    txt: "avançou ontem",
+    bg: "var(--lime-soft)",
+    c: "var(--lime)"
+  };
+  if (d >= 5) return {
+    txt: `parado há ${d} dias`,
+    bg: "var(--warn-soft)",
+    c: "var(--warn)"
+  };
+  return {
+    txt: `há ${d} dias`,
+    bg: "transparent",
+    c: "var(--text-3)"
+  };
 }
-
-function CategoriaBloco({ cat, projetos, onAvancar, onToggleEtapa, onFav, onEdit, onRemove }) {
+function CategoriaBloco({
+  cat,
+  projetos,
+  onAvancar,
+  onToggleEtapa,
+  onFav,
+  onEdit,
+  onRemove
+}) {
   const [open, setOpen] = useState(true);
-  const totalEtapas = projetos.reduce((s,p) => s + p.etapas.length, 0);
-  const doneEtapas = projetos.reduce((s,p) => s + p.etapas.filter(e=>e.concluida).length, 0);
-  return (
-    <div style={{marginBottom:14}}>
-      <div className="row" onClick={() => setOpen(!open)}
-        style={{justifyContent:"space-between",cursor:"pointer",padding:"8px 2px",borderBottom:"1px solid var(--border)"}}>
-        <div className="row" style={{gap:7}}>
-          <span style={{color:"var(--text-3)",fontSize:13,transform:open?"rotate(90deg)":"none",transition:".15s"}}>▸</span>
-          <span style={{fontSize:14,fontWeight:600}}>{cat.emoji} {cat.nome}</span>
-        </div>
-        <span style={{fontSize:11,color:"var(--text-3)"}}>{doneEtapas}/{totalEtapas}</span>
-      </div>
-      {open && projetos.map((p,i) => (
-        <ProjectCard key={i} p={p} onAvancar={onAvancar} onToggleEtapa={onToggleEtapa}
-          onFav={onFav} onEdit={onEdit} onRemove={onRemove} />
-      ))}
-    </div>
-  );
+  const agg = projetos.reduce((a, p) => {
+    const g = progressoPassadas(p.etapas);
+    a.f += g.feitas;
+    a.t += g.total;
+    return a;
+  }, {
+    f: 0,
+    t: 0
+  });
+  const totalEtapas = agg.t,
+    doneEtapas = agg.f;
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    onClick: () => setOpen(!open),
+    style: {
+      justifyContent: "space-between",
+      cursor: "pointer",
+      padding: "8px 2px",
+      borderBottom: "1px solid var(--border)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 7
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--text-3)",
+      fontSize: 13,
+      transform: open ? "rotate(90deg)" : "none",
+      transition: ".15s"
+    }
+  }, "▸"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, cat.emoji, " ", cat.nome)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-3)"
+    }
+  }, doneEtapas, "/", totalEtapas)), open && projetos.map((p, i) => /*#__PURE__*/React.createElement(ProjectCard, {
+    key: i,
+    p: p,
+    onAvancar: onAvancar,
+    onToggleEtapa: onToggleEtapa,
+    onFav: onFav,
+    onEdit: onEdit,
+    onRemove: onRemove
+  })));
 }
-
-function ProjectCard({ p, onAvancar, onToggleEtapa, onFav, onEdit, onRemove }) {
+function ProjectCard({
+  p,
+  onAvancar,
+  onToggleEtapa,
+  onFav,
+  onEdit,
+  onRemove
+}) {
   const st = statusBadge(p);
   const nextIdx = p.etapas.findIndex(e => !e.concluida);
-  return (
-    <div className="fade" style={{background:"var(--card)",border:"1px solid var(--border)",borderRadius:13,padding:14,marginTop:10}}>
-      <div className="row" style={{justifyContent:"space-between",marginBottom:12}}>
-        <div className="row" style={{gap:8,minWidth:0}}>
-          <span style={{fontSize:14,fontWeight:600}}>{p.emoji} {p.projeto}</span>
-        </div>
-        <div className="row" style={{gap:8,flex:"none"}}>
-          {st && <span className="chip" style={{background:st.bg,color:st.c}}>{st.txt}</span>}
-          <span onClick={() => onFav(p)} style={{cursor:"pointer",color:p.favorito?"var(--warn)":"var(--text-3)",fontSize:16}}>★</span>
-          <span onClick={() => onEdit(p)} style={{cursor:"pointer",color:"var(--text-3)",fontSize:14}}>✎</span>
-        </div>
-      </div>
-
-      <div>
-        {p.etapas.map((e, i) => {
-          const isNext = i === nextIdx;
-          if (isNext) {
-            return (
-              <div key={e.id} className="row" style={{gap:10,padding:"9px 11px",background:"var(--lime-soft)",borderRadius:9,margin:"3px 0"}}>
-                <span style={{color:"var(--lime)",fontSize:16}}>▷</span>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:10,color:"var(--lime)",opacity:.85}}>Você está aqui</div>
-                  <div style={{fontSize:14,fontWeight:600,color:"var(--text)"}}>{e.texto}</div>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={() => onAvancar(p)}>✓ Avancei</button>
-              </div>
-            );
-          }
-          return (
-            <div key={e.id} className="row" style={{gap:10,padding:"5px 0",cursor:"pointer"}} onClick={() => onToggleEtapa(p, e.id)}>
-              <span style={{color:e.concluida?"var(--lime)":"var(--text-3)",fontSize:15}}>{e.concluida?"◉":"○"}</span>
-              <span style={{fontSize:13,color:e.concluida?"var(--text-3)":"var(--text-2)",textDecoration:e.concluida?"line-through":"none"}}>{e.texto}</span>
-            </div>
-          );
-        })}
-        {p.etapas.length === 0 && (
-          <div style={{fontSize:12,color:"var(--text-3)",padding:"6px 0"}}>Sem etapas ainda — toque em ✎ para adicionar.</div>
-        )}
-        {nextIdx === -1 && p.etapas.length > 0 && (
-          <div style={{fontSize:12,color:"var(--lime)",padding:"6px 0"}}>🎉 Trilha completa!</div>
-        )}
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fade",
+    style: {
+      background: "var(--card)",
+      border: "1px solid var(--border)",
+      borderRadius: 13,
+      padding: 14,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 8,
+      minWidth: 0
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600
+    }
+  }, p.emoji, " ", p.projeto)), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 8,
+      flex: "none"
+    }
+  }, st && /*#__PURE__*/React.createElement("span", {
+    className: "chip",
+    style: {
+      background: st.bg,
+      color: st.c
+    }
+  }, st.txt), /*#__PURE__*/React.createElement("span", {
+    onClick: () => onFav(p),
+    style: {
+      cursor: "pointer",
+      color: p.favorito ? "var(--warn)" : "var(--text-3)",
+      fontSize: 16
+    }
+  }, "★"), /*#__PURE__*/React.createElement("span", {
+    onClick: () => onEdit(p),
+    style: {
+      cursor: "pointer",
+      color: "var(--text-3)",
+      fontSize: 14
+    }
+  }, "✎"))), /*#__PURE__*/React.createElement("div", null, p.etapas.map((e, i) => {
+    const isNext = i === nextIdx;
+    const meta = e.meta || 1;
+    const pas = e.passadas || 0;
+    const bolinhas = meta > 1 ? "●".repeat(pas) + "○".repeat(Math.max(0, meta - pas)) : "";
+    if (isNext) {
+      const ultima = pas + 1 >= meta;
+      return /*#__PURE__*/React.createElement("div", {
+        key: e.id,
+        className: "row",
+        style: {
+          gap: 10,
+          padding: "9px 11px",
+          background: "var(--lime-soft)",
+          borderRadius: 9,
+          margin: "3px 0"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: "var(--lime)",
+          fontSize: 16
+        }
+      }, "▷"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 0
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: "var(--lime)",
+          opacity: .85
+        }
+      }, "Você está aqui", meta > 1 ? ` · passada ${pas}/${meta}` : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: "var(--text)"
+        }
+      }, e.texto), meta > 1 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: "var(--lime)",
+          letterSpacing: 2,
+          marginTop: 2
+        }
+      }, bolinhas)), /*#__PURE__*/React.createElement("button", {
+        className: "btn btn-primary btn-sm",
+        onClick: () => onAvancar(p)
+      }, meta > 1 ? ultima ? "✓ Concluir" : "+1 passada" : "✓ Avancei"));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      key: e.id,
+      className: "row",
+      style: {
+        gap: 10,
+        padding: "5px 0",
+        cursor: "pointer"
+      },
+      onClick: () => onToggleEtapa(p, e.id)
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: e.concluida ? "var(--lime)" : "var(--text-3)",
+        fontSize: 15
+      }
+    }, e.concluida ? "◉" : "○"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 13,
+        color: e.concluida ? "var(--text-3)" : "var(--text-2)",
+        textDecoration: e.concluida ? "line-through" : "none"
+      }
+    }, e.texto), meta > 1 && !e.concluida && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "var(--text-3)",
+        letterSpacing: 1.5
+      }
+    }, bolinhas));
+  }), p.etapas.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-3)",
+      padding: "6px 0"
+    }
+  }, "Sem etapas ainda — toque em ✎ para adicionar."), nextIdx === -1 && p.etapas.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "var(--lime)",
+      padding: "6px 0"
+    }
+  }, "🎉 Trilha completa!")));
 }
-
-function RotinasFooter({ rotinas, onToggle, onAdd, onRemove }) {
+function RotinasFooter({
+  rotinas,
+  onToggle,
+  onAdd,
+  onRemove
+}) {
   const feitas = rotinas.filter(r => r.etapas[0] && r.etapas[0].concluida).length;
-  return (
-    <div style={{borderTop:"1px solid var(--border)",paddingTop:14,marginTop:22}}>
-      <div className="row" style={{justifyContent:"space-between",marginBottom:9}}>
-        <div className="row" style={{gap:6}}>
-          <span style={{fontSize:12,fontWeight:600,color:"var(--text-2)"}}>🔁 Rotinas</span>
-          {rotinas.length>0 && <span style={{fontSize:11,color:"var(--text-3)"}}>{feitas}/{rotinas.length}</span>}
-        </div>
-        <button className="btn btn-ghost btn-sm" onClick={onAdd}>+ rotina</button>
-      </div>
-      <div className="row" style={{gap:7,flexWrap:"wrap"}}>
-        {rotinas.map((r,i) => {
-          const done = r.etapas[0] && r.etapas[0].concluida;
-          return (
-            <span key={i} onClick={() => onToggle(r)} onDoubleClick={() => { if(confirm("Remover rotina?")) onRemove(r); }}
-              className="chip" style={{cursor:"pointer",padding:"5px 11px",
-                background:done?"var(--lime-soft)":"transparent",
-                color:done?"var(--lime)":"var(--text-3)",
-                border:done?"1px solid #7fd85840":"1px solid var(--border-strong)"}}>
-              {done?"✓":"○"} {r.projeto}
-            </span>
-          );
-        })}
-        {rotinas.length===0 && <span style={{fontSize:12,color:"var(--text-3)"}}>Nenhuma rotina. Toque em “+ rotina”.</span>}
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderTop: "1px solid var(--border)",
+      paddingTop: 14,
+      marginTop: 22
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between",
+      marginBottom: 9
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "var(--text-2)"
+    }
+  }, "🔁 Rotinas"), rotinas.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-3)"
+    }
+  }, feitas, "/", rotinas.length)), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: onAdd
+  }, "+ rotina")), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, rotinas.map((r, i) => {
+    const done = r.etapas[0] && r.etapas[0].concluida;
+    return /*#__PURE__*/React.createElement("span", {
+      key: i,
+      onClick: () => onToggle(r),
+      onDoubleClick: () => {
+        if (confirm("Remover rotina?")) onRemove(r);
+      },
+      className: "chip",
+      style: {
+        cursor: "pointer",
+        padding: "5px 11px",
+        background: done ? "var(--lime-soft)" : "transparent",
+        color: done ? "var(--lime)" : "var(--text-3)",
+        border: done ? "1px solid #7fd85840" : "1px solid var(--border-strong)"
+      }
+    }, done ? "✓" : "○", " ", r.projeto);
+  }), rotinas.length === 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--text-3)"
+    }
+  }, "Nenhuma rotina. Toque em “+ rotina”.")));
 }
-
-function EmptyState({ onAdd }) {
-  return (
-    <div style={{textAlign:"center",padding:"36px 16px",color:"var(--text-3)"}}>
-      <div style={{fontSize:34,marginBottom:10}}>🌱</div>
-      <div style={{fontSize:14,color:"var(--text-2)",marginBottom:4}}>Comece sua primeira trilha</div>
-      <div style={{fontSize:12,marginBottom:16}}>Quebre um projeto árduo em 3–5 etapas e nunca mais perca o próximo passo.</div>
-      <button className="btn btn-primary btn-sm" onClick={onAdd}>+ Criar projeto</button>
-    </div>
-  );
+function EmptyState({
+  onAdd
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: "36px 16px",
+      color: "var(--text-3)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 34,
+      marginBottom: 10
+    }
+  }, "🌱"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: "var(--text-2)",
+      marginBottom: 4
+    }
+  }, "Comece sua primeira trilha"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      marginBottom: 16
+    }
+  }, "Quebre um projeto árduo em etapas, defina quantas passadas cada uma pede, e nunca mais perca o próximo passo."), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary btn-sm",
+    onClick: onAdd
+  }, "+ Criar projeto"));
 }
 
 /* ============ EDITOR ============ */
-function EditorModal({ editing, onClose, onSave }) {
+function EditorModal({
+  editing,
+  onClose,
+  onSave
+}) {
   const isNew = editing.ref === "new";
   const isRotina = editing.tipo === "Rotina";
   const [projeto, setProjeto] = useState(isNew ? "" : editing.projeto);
   const [categoria, setCategoria] = useState(isNew ? CATEGORIAS[0].nome : editing.categoria);
   const [rotinaFreq, setRotinaFreq] = useState(editing.rotinaFreq || "Diaria");
-  const [etapas, setEtapas] = useState(isNew ? [""] : editing.etapas.map(e => e.texto));
-
+  const [etapas, setEtapas] = useState(isNew ? [{
+    texto: "",
+    meta: DEFAULT_META
+  }] : editing.etapas.map(e => ({
+    texto: e.texto,
+    meta: e.meta || DEFAULT_META
+  })));
   const emoji = (CATEGORIAS.find(c => c.nome === categoria) || {}).emoji || "•";
-
+  const setEt = (i, patch) => setEtapas(etapas.map((x, j) => j === i ? {
+    ...x,
+    ...patch
+  } : x));
   function build() {
-    const base = isNew ? {} : editing.ref;
-    const etapasClean = isRotina ? [projeto] : etapas.map(s => s.trim()).filter(Boolean);
-    const oldEtapas = (!isNew && editing.etapas) || [];
+    const etapasClean = isRotina ? [{
+      texto: projeto,
+      meta: 1
+    }] : etapas.filter(e => e.texto.trim());
+    const oldEtapas = !isNew && editing.etapas || [];
     return {
       projeto: projeto.trim() || "Sem nome",
-      categoria, emoji, tipo: editing.tipo, rotinaFreq,
+      categoria,
+      emoji,
+      tipo: editing.tipo,
+      rotinaFreq,
       favorito: !isNew ? editing.favorito : false,
       ultimoAvanco: !isNew ? editing.ultimoAvanco : "",
-      etapas: etapasClean.map((texto, i) => {
+      etapas: etapasClean.map((et, i) => {
         const prev = oldEtapas[i];
-        return { id: prev ? prev.id : uid(), texto, ordem: i, concluida: prev ? prev.concluida : false };
-      }),
+        const meta = Math.max(1, parseInt(et.meta) || 1);
+        return {
+          id: prev ? prev.id : uid(),
+          texto: et.texto.trim(),
+          ordem: i,
+          meta,
+          passadas: prev ? Math.min(prev.passadas || 0, meta) : 0,
+          concluida: prev ? Math.min(prev.passadas || 0, meta) >= meta : false
+        };
+      })
     };
   }
-
-  return (
-    <div className="modal-bg" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="row" style={{justifyContent:"space-between",marginBottom:16}}>
-          <span style={{fontSize:16,fontWeight:600}}>
-            {isNew ? (isRotina?"Nova rotina":"Novo projeto") : "Editar"}
-          </span>
-          <span onClick={onClose} style={{cursor:"pointer",color:"var(--text-3)",fontSize:18}}>✕</span>
-        </div>
-
-        <div style={{marginBottom:14}}>
-          <label>{isRotina?"Nome da rotina":"Nome do projeto"}</label>
-          <input value={projeto} onChange={e => setProjeto(e.target.value)}
-            placeholder={isRotina?"Ex: Oração":"Ex: Aprender violino"} autoFocus />
-        </div>
-
-        {!isRotina && (
-          <div style={{marginBottom:14}}>
-            <label>Categoria</label>
-            <select value={categoria} onChange={e => setCategoria(e.target.value)}>
-              {CATEGORIAS.map(c => <option key={c.nome} value={c.nome}>{c.emoji} {c.nome}</option>)}
-            </select>
-          </div>
-        )}
-
-        {isRotina && (
-          <div style={{marginBottom:14}}>
-            <label>Frequência</label>
-            <select value={rotinaFreq} onChange={e => setRotinaFreq(e.target.value)}>
-              <option value="Diaria">Diária (reseta todo dia)</option>
-              <option value="Semanal">Semanal (reseta domingo)</option>
-            </select>
-          </div>
-        )}
-
-        {!isRotina && (
-          <div style={{marginBottom:16}}>
-            <label>Etapas da trilha (a ordem é o caminho)</label>
-            {etapas.map((et, i) => (
-              <div key={i} className="row" style={{gap:6,marginBottom:6}}>
-                <span style={{color:"var(--text-3)",fontSize:12,width:16}}>{i+1}.</span>
-                <input value={et} onChange={e => setEtapas(etapas.map((x,j)=>j===i?e.target.value:x))}
-                  placeholder={`Etapa ${i+1}`} />
-                <span onClick={() => setEtapas(etapas.filter((_,j)=>j!==i))}
-                  style={{cursor:"pointer",color:"var(--text-3)",padding:"0 4px"}}>✕</span>
-              </div>
-            ))}
-            <button className="btn btn-ghost btn-sm" onClick={() => setEtapas([...etapas, ""])}>+ etapa</button>
-          </div>
-        )}
-
-        <div className="row" style={{gap:8,marginTop:8}}>
-          <button className="btn btn-primary" style={{flex:1,justifyContent:"center"}}
-            onClick={() => onSave(build(), isNew)}>Salvar</button>
-          {!isNew && (
-            <button className="btn" style={{borderColor:"var(--danger)",color:"var(--danger)"}}
-              onClick={() => { if(confirm("Excluir este item?")) { onSave(null, false); onClose(); location.reload(); } }}>Excluir</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return /*#__PURE__*/React.createElement("div", {
+    className: "modal-bg",
+    onClick: onClose
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "modal",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 16,
+      fontWeight: 600
+    }
+  }, isNew ? isRotina ? "Nova rotina" : "Novo projeto" : "Editar"), /*#__PURE__*/React.createElement("span", {
+    onClick: onClose,
+    style: {
+      cursor: "pointer",
+      color: "var(--text-3)",
+      fontSize: 18
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", null, isRotina ? "Nome da rotina" : "Nome do projeto"), /*#__PURE__*/React.createElement("input", {
+    value: projeto,
+    onChange: e => setProjeto(e.target.value),
+    placeholder: isRotina ? "Ex: Oração" : "Ex: Aprender violino",
+    autoFocus: true
+  })), !isRotina && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Categoria"), /*#__PURE__*/React.createElement("select", {
+    value: categoria,
+    onChange: e => setCategoria(e.target.value)
+  }, CATEGORIAS.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.nome,
+    value: c.nome
+  }, c.emoji, " ", c.nome)))), isRotina && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Frequência"), /*#__PURE__*/React.createElement("select", {
+    value: rotinaFreq,
+    onChange: e => setRotinaFreq(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "Diaria"
+  }, "Diária (reseta todo dia)"), /*#__PURE__*/React.createElement("option", {
+    value: "Semanal"
+  }, "Semanal (reseta domingo)"))), !isRotina && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", null, "Etapas da trilha — texto e nº de passadas (repetições até dominar)"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 6,
+      marginBottom: 5
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 16
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 10,
+      color: "var(--text-3)"
+    }
+  }, "Módulo / aula"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 52,
+      fontSize: 10,
+      color: "var(--text-3)",
+      textAlign: "center"
+    }
+  }, "passadas"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 18
+    }
+  })), etapas.map((et, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "row",
+    style: {
+      gap: 6,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "var(--text-3)",
+      fontSize: 12,
+      width: 16
+    }
+  }, i + 1, "."), /*#__PURE__*/React.createElement("input", {
+    value: et.texto,
+    onChange: e => setEt(i, {
+      texto: e.target.value
+    }),
+    placeholder: `Etapa ${i + 1}`
+  }), /*#__PURE__*/React.createElement("input", {
+    type: "number",
+    min: "1",
+    max: "20",
+    value: et.meta,
+    onChange: e => setEt(i, {
+      meta: e.target.value
+    }),
+    style: {
+      width: 52,
+      textAlign: "center",
+      padding: "9px 4px"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    onClick: () => setEtapas(etapas.filter((_, j) => j !== i)),
+    style: {
+      cursor: "pointer",
+      color: "var(--text-3)",
+      padding: "0 2px",
+      width: 18
+    }
+  }, "✕"))), /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setEtapas([...etapas, {
+      texto: "",
+      meta: DEFAULT_META
+    }])
+  }, "+ etapa")), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 8,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-primary",
+    style: {
+      flex: 1,
+      justifyContent: "center"
+    },
+    onClick: () => onSave(build(), isNew)
+  }, "Salvar"), !isNew && /*#__PURE__*/React.createElement("button", {
+    className: "btn",
+    style: {
+      borderColor: "var(--danger)",
+      color: "var(--danger)"
+    },
+    onClick: () => {
+      if (confirm("Excluir este item?")) {
+        onSave(null, false);
+        onClose();
+        location.reload();
+      }
+    }
+  }, "Excluir"))));
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.createElement(App, null));
 </script>
 </body>
 </html>
