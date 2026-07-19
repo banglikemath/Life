@@ -377,7 +377,7 @@ const {
 
 /* ============ CONFIG ============ */
 // Cole aqui a URL do seu Web App após publicar o Code.gs (Implantar > App da Web)
-const API_URL = "https://script.google.com/macros/s/AKfycbzsG1dCXRXn-JSNAjFTA-oDwyI_RK5CPhx0TLXhzjHusrVAgEXD2X8nVRqBNqNAUk49/exec"
+const API_URL = "https://script.google.com/macros/s/AKfycbzsG1dCXRXn-JSNAjFTA-oDwyI_RK5CPhx0TLXhzjHusrVAgEXD2X8nVRqBNqNAUk49/exec"; // ex: "https://script.google.com/macros/s/AKfy.../exec"
 const LS_KEY = "life_dashboard_v1";
 const CATEGORIAS = [{
   nome: "Lazer e Música",
@@ -520,10 +520,13 @@ function App() {
   const [projects, setProjects] = useState([]);
   const [log, setLog] = useState([]); // eventos de avanço: {data, projeto, categoria, etapa}
   const [loaded, setLoaded] = useState(false);
-  const [syncState, setSyncState] = useState("idle"); // idle|saving|ok|err
+  const [syncState, setSyncState] = useState("idle"); // status do PULL manual: idle|saving|ok|err|noapi
+  const [autoState, setAutoState] = useState("idle"); // status do auto-push: idle|saving|ok|err
   const [editing, setEditing] = useState(null); // projeto em edição ou "new"
   const [view, setView] = useState("home"); // home | progresso
   const dirty = useRef(false);
+  const pushTimer = useRef(null);
+  const firstSave = useRef(true);
 
   // Carrega do localStorage na abertura
   useEffect(() => {
@@ -547,6 +550,38 @@ function App() {
       savedAt: Date.now()
     }));
     dirty.current = true;
+  }, [projects, log, loaded]);
+
+  // Auto-push pro Sheets (debounce 2s após a última mudança)
+  useEffect(() => {
+    if (!loaded || !API_URL) return;
+    // não dispara no primeiro load (que é quando o estado é populado)
+    if (firstSave.current) {
+      firstSave.current = false;
+      return;
+    }
+    if (pushTimer.current) clearTimeout(pushTimer.current);
+    setAutoState("saving");
+    pushTimer.current = setTimeout(async () => {
+      try {
+        await apiCall({
+          action: "sync",
+          rows: projectsToRows(projects)
+        });
+        await apiCall({
+          action: "syncLog",
+          log: log
+        });
+        dirty.current = false;
+        setAutoState("ok");
+        setTimeout(() => setAutoState("idle"), 1500);
+      } catch (e) {
+        setAutoState("err"); // fica em erro até a próxima tentativa dar certo
+      }
+    }, 2000);
+    return () => {
+      if (pushTimer.current) clearTimeout(pushTimer.current);
+    };
   }, [projects, log, loaded]);
 
   // Reseta rotinas cujo último check não é de hoje/desta semana
@@ -705,26 +740,10 @@ function App() {
     if (isNew) setProjects(prev => [...prev, proj]);else setProjects(prev => prev.map(p => p === editing.ref ? proj : p));
     setEditing(null);
   }
-  async function sync() {
-    setSyncState("saving");
-    try {
-      await apiCall({
-        action: "sync",
-        rows: projectsToRows(projects)
-      });
-      await apiCall({
-        action: "syncLog",
-        log: log
-      });
-      setSyncState("ok");
-      dirty.current = false;
-      setTimeout(() => setSyncState("idle"), 2000);
-    } catch (e) {
-      setSyncState(e.message === "no-api" ? "noapi" : "err");
-      setTimeout(() => setSyncState("idle"), 3500);
-    }
-  }
   async function pull() {
+    // Confirmação: puxar sobrescreve o que está neste dispositivo
+    const temLocal = projects.length > 0;
+    if (temLocal && !confirm("Puxar do Sheets vai substituir os projetos deste dispositivo pela versão da nuvem. As mudanças recentes deste aparelho já sincronizaram? Continuar?")) return;
     setSyncState("saving");
     try {
       const r = await apiCall({
@@ -736,6 +755,7 @@ function App() {
       if (r.ok) {
         setProjects(resetRotinas(rowsToProjects(r.rows)));
         if (rl.ok) setLog(rl.log || []);
+        firstSave.current = true; // não re-empurra logo após puxar
         setSyncState("ok");
         setTimeout(() => setSyncState("idle"), 2000);
       } else throw new Error(r.error);
@@ -748,8 +768,8 @@ function App() {
   return /*#__PURE__*/React.createElement("div", {
     className: "wrap"
   }, /*#__PURE__*/React.createElement(Header, {
-    syncState: syncState,
-    onSync: sync,
+    autoState: autoState,
+    pullState: syncState,
     onPull: pull,
     hasApi: !!API_URL,
     view: view,
@@ -819,20 +839,47 @@ function App() {
   }));
 }
 function Header({
-  syncState,
-  onSync,
+  autoState,
   onPull,
+  pullState,
   hasApi,
   view,
   setView
 }) {
-  const label = {
-    idle: "Sincronizar",
-    saving: "Sincronizando…",
-    ok: "Sincronizado ✓",
+  // indicador discreto do auto-save
+  const auto = {
+    idle: {
+      txt: "salvo",
+      cor: "var(--text-3)",
+      dot: "var(--text-3)"
+    },
+    saving: {
+      txt: "salvando…",
+      cor: "var(--text-3)",
+      dot: "var(--warn)"
+    },
+    ok: {
+      txt: "salvo ✓",
+      cor: "var(--lime)",
+      dot: "var(--lime)"
+    },
+    err: {
+      txt: "sem conexão",
+      cor: "var(--danger)",
+      dot: "var(--danger)"
+    }
+  }[autoState] || {
+    txt: "",
+    cor: "var(--text-3)",
+    dot: "var(--text-3)"
+  };
+  const pullLabel = {
+    idle: "↓ Puxar",
+    saving: "Puxando…",
+    ok: "Puxado ✓",
     err: "Erro ✕",
-    noapi: "Configure a API"
-  }[syncState];
+    noapi: "Config. API"
+  }[pullState] || "↓ Puxar";
   const tab = (id, txt) => /*#__PURE__*/React.createElement("span", {
     onClick: () => setView(id),
     style: {
@@ -870,26 +917,37 @@ function Header({
       fontSize: 11,
       color: "var(--text-3)"
     }
-  }, "onde você parou, e o próximo passo"))), /*#__PURE__*/React.createElement("div", {
-    className: "row",
-    style: {
-      gap: 6
-    }
-  }, hasApi && /*#__PURE__*/React.createElement("button", {
-    className: "btn btn-ghost btn-sm",
-    onClick: onPull,
-    title: "Puxar do Sheets"
-  }, "↓"), /*#__PURE__*/React.createElement("button", {
+  }, "onde você parou, e o próximo passo"))), hasApi && /*#__PURE__*/React.createElement("button", {
     className: "btn btn-sm",
-    onClick: onSync,
-    style: syncState === "ok" ? {
+    onClick: onPull,
+    style: pullState === "ok" ? {
       borderColor: "var(--lime)",
       color: "var(--lime)"
-    } : syncState === "err" ? {
+    } : pullState === "err" ? {
       borderColor: "var(--danger)",
       color: "var(--danger)"
     } : {}
-  }, label))), /*#__PURE__*/React.createElement("div", {
+  }, pullLabel)), hasApi && /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 5,
+      marginTop: 8,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 7,
+      height: 7,
+      borderRadius: "50%",
+      background: auto.dot,
+      display: "inline-block"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: auto.cor
+    }
+  }, auto.txt)), /*#__PURE__*/React.createElement("div", {
     className: "row",
     style: {
       gap: 6,
