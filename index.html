@@ -429,6 +429,18 @@ const progressoPassadas = etapas => {
   };
 };
 const DEFAULT_META = 3;
+// Ordena categorias: as fixas primeiro (na ordem de CATEGORIAS), órfãs depois
+function ordenarCategorias(nomes) {
+  const ordem = CATEGORIAS.map(c => c.nome);
+  return [...nomes].sort((a, b) => {
+    const ia = ordem.indexOf(a),
+      ib = ordem.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
 
 // Estrutura em memória: lista de projetos, cada um com etapas.
 // Persistência: no Sheets é 1 linha por etapa; aqui agrupamos.
@@ -811,20 +823,26 @@ function App() {
       ref: "new",
       tipo: "Projeto"
     })
-  }), CATEGORIAS.filter(c => porCategoria[c.nome]).map(c => /*#__PURE__*/React.createElement(CategoriaBloco, {
-    key: c.nome,
-    cat: c,
-    projetos: porCategoria[c.nome],
-    onAvancar: avancar,
-    onVoltar: voltar,
-    onToggleEtapa: toggleEtapa,
-    onFav: toggleFav,
-    onEdit: p => setEditing({
-      ref: p,
-      ...p
-    }),
-    onRemove: removeProject
-  })), /*#__PURE__*/React.createElement(RotinasFooter, {
+  }), ordenarCategorias(Object.keys(porCategoria)).map(nome => {
+    const cat = CATEGORIAS.find(c => c.nome === nome) || {
+      nome,
+      emoji: porCategoria[nome][0] && porCategoria[nome][0].emoji || "📌"
+    };
+    return /*#__PURE__*/React.createElement(CategoriaBloco, {
+      key: nome,
+      cat: cat,
+      projetos: porCategoria[nome],
+      onAvancar: avancar,
+      onVoltar: voltar,
+      onToggleEtapa: toggleEtapa,
+      onFav: toggleFav,
+      onEdit: p => setEditing({
+        ref: p,
+        ...p
+      }),
+      onRemove: removeProject
+    });
+  }), /*#__PURE__*/React.createElement(RotinasFooter, {
     rotinas: rotinas,
     onToggle: toggleRotina,
     onAdd: () => setEditing({
@@ -988,7 +1006,7 @@ function FocusBand({
     const next = p.etapas.find(e => !e.concluida);
     const prog = progressoPassadas(p.etapas);
     return /*#__PURE__*/React.createElement("div", {
-      key: i,
+      key: p.projeto + "|" + p.tipo,
       className: "focus-card fade",
       style: {
         minWidth: 190,
@@ -1147,7 +1165,7 @@ function CategoriaBloco({
       color: "var(--text-3)"
     }
   }, doneEtapas, "/", totalEtapas)), open && projetos.map((p, i) => /*#__PURE__*/React.createElement(ProjectCard, {
-    key: i,
+    key: p.projeto + "|" + p.tipo,
     p: p,
     onAvancar: onAvancar,
     onVoltar: onVoltar,
@@ -1389,7 +1407,7 @@ function RotinasFooter({
   }, rotinas.map((r, i) => {
     const done = r.etapas[0] && r.etapas[0].concluida;
     return /*#__PURE__*/React.createElement("span", {
-      key: i,
+      key: r.projeto,
       onClick: () => onToggle(r),
       onDoubleClick: () => {
         if (confirm("Remover rotina?")) onRemove(r);
