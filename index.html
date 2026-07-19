@@ -623,6 +623,21 @@ function App() {
     });
     return g;
   }, [projetos]);
+
+  // Lista de categorias disponíveis no editor: fixas + as que já existem em projetos
+  const categoriasDisponiveis = useMemo(() => {
+    const map = {};
+    CATEGORIAS.forEach(c => {
+      map[c.nome] = c.emoji;
+    });
+    projetos.forEach(p => {
+      if (p.categoria && !map[p.categoria]) map[p.categoria] = p.emoji || "📌";
+    });
+    return ordenarCategorias(Object.keys(map)).map(nome => ({
+      nome,
+      emoji: map[nome]
+    }));
+  }, [projetos]);
   function setProject(target, patch) {
     setProjects(prev => prev.map(p => p === target ? {
       ...p,
@@ -852,6 +867,7 @@ function App() {
     onRemove: removeProject
   })), editing && /*#__PURE__*/React.createElement(EditorModal, {
     editing: editing,
+    categorias: categoriasDisponiveis,
     onClose: () => setEditing(null),
     onSave: saveEdited
   }));
@@ -1785,13 +1801,19 @@ function EmptyState({
 /* ============ EDITOR ============ */
 function EditorModal({
   editing,
+  categorias,
   onClose,
   onSave
 }) {
+  const CATS = categorias && categorias.length ? categorias : CATEGORIAS;
+  const EMOJIS = ["📌", "📚", "💼", "🎻", "🌿", "🏠", "💪", "💰", "❤️", "🎯", "🧠", "✍️", "🎨", "🍎", "⛪", "🚀", "📈", "🛠️", "🌱", "⭐"];
   const isNew = editing.ref === "new";
   const isRotina = editing.tipo === "Rotina";
   const [projeto, setProjeto] = useState(isNew ? "" : editing.projeto);
-  const [categoria, setCategoria] = useState(isNew ? CATEGORIAS[0].nome : editing.categoria);
+  const [categoria, setCategoria] = useState(isNew ? CATS[0].nome : editing.categoria);
+  const [novaCategoria, setNovaCategoria] = useState(false); // criando categoria nova?
+  const [novoNome, setNovoNome] = useState("");
+  const [novoEmoji, setNovoEmoji] = useState("📌");
   const [rotinaFreq, setRotinaFreq] = useState(editing.rotinaFreq || "Diaria");
   const [etapas, setEtapas] = useState(isNew ? [{
     texto: "",
@@ -1800,7 +1822,10 @@ function EditorModal({
     texto: e.texto,
     meta: e.meta || DEFAULT_META
   })));
-  const emoji = (CATEGORIAS.find(c => c.nome === categoria) || {}).emoji || "•";
+
+  // emoji resultante: se criando nova, usa o escolhido; senão o da categoria selecionada
+  const emoji = novaCategoria ? novoEmoji : (CATS.find(c => c.nome === categoria) || {}).emoji || "📌";
+  const catFinal = novaCategoria ? novoNome.trim() || "Nova categoria" : categoria;
   const setEt = (i, patch) => setEtapas(etapas.map((x, j) => j === i ? {
     ...x,
     ...patch
@@ -1813,7 +1838,7 @@ function EditorModal({
     const oldEtapas = !isNew && editing.etapas || [];
     return {
       projeto: projeto.trim() || "Sem nome",
-      categoria,
+      categoria: catFinal,
       emoji,
       tipo: editing.tipo,
       rotinaFreq,
@@ -1870,13 +1895,77 @@ function EditorModal({
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement("label", null, "Categoria"), /*#__PURE__*/React.createElement("select", {
+  }, /*#__PURE__*/React.createElement("label", null, "Categoria"), !novaCategoria ? /*#__PURE__*/React.createElement("select", {
     value: categoria,
-    onChange: e => setCategoria(e.target.value)
-  }, CATEGORIAS.map(c => /*#__PURE__*/React.createElement("option", {
+    onChange: e => {
+      if (e.target.value === "__nova__") {
+        setNovaCategoria(true);
+      } else setCategoria(e.target.value);
+    }
+  }, CATS.map(c => /*#__PURE__*/React.createElement("option", {
     key: c.nome,
     value: c.nome
-  }, c.emoji, " ", c.nome)))), isRotina && /*#__PURE__*/React.createElement("div", {
+  }, c.emoji, " ", c.nome)), /*#__PURE__*/React.createElement("option", {
+    value: "__nova__"
+  }, "➕ Nova categoria…")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "var(--bg-elev)",
+      borderRadius: 10,
+      padding: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      justifyContent: "space-between",
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: "var(--lime)"
+    }
+  }, "Nova categoria"), /*#__PURE__*/React.createElement("span", {
+    onClick: () => {
+      setNovaCategoria(false);
+      setCategoria(CATS[0].nome);
+    },
+    style: {
+      cursor: "pointer",
+      fontSize: 11,
+      color: "var(--text-3)"
+    }
+  }, "← usar existente")), /*#__PURE__*/React.createElement("input", {
+    value: novoNome,
+    onChange: e => setNovoNome(e.target.value),
+    placeholder: "Ex: Finanças",
+    style: {
+      marginBottom: 8
+    },
+    autoFocus: true
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "var(--text-3)",
+      marginBottom: 6
+    }
+  }, "Escolha um emoji:"), /*#__PURE__*/React.createElement("div", {
+    className: "row",
+    style: {
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, EMOJIS.map(em => /*#__PURE__*/React.createElement("span", {
+    key: em,
+    onClick: () => setNovoEmoji(em),
+    style: {
+      cursor: "pointer",
+      fontSize: 20,
+      padding: "4px 6px",
+      borderRadius: 8,
+      background: novoEmoji === em ? "var(--lime-soft)" : "transparent",
+      border: novoEmoji === em ? "1px solid var(--lime)" : "1px solid transparent"
+    }
+  }, em))))), isRotina && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
