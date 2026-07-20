@@ -1345,14 +1345,14 @@ function ProjectCard({
           width: 34,
           height: 34,
           borderRadius: 9,
-          background: ultima ? "var(--lime)" : "transparent",
-          border: ultima ? "1px solid var(--lime)" : "1.5px solid var(--lime-dim)",
-          color: ultima ? "#0b0f0c" : "var(--lime)",
+          background: "transparent",
+          border: "1.5px solid var(--lime-dim)",
+          color: "var(--lime)",
           fontSize: 19,
           fontWeight: 700,
           transition: ".15s"
         }
-      }, ultima ? "✓" : "")));
+      }, "")));
     }
     return /*#__PURE__*/React.createElement("div", {
       key: e.id,
