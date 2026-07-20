@@ -57,6 +57,10 @@
   .chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 9px;border-radius:20px;}
   .fade{animation:fade .25s ease;}
   @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  @keyframes pulse-dot{0%{transform:scale(1);}40%{transform:scale(1.5);}100%{transform:scale(1);}}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;transition:.15s;}
+  .dot-on{background:var(--lime);animation:pulse-dot .35s ease;}
+  .dot-off{background:transparent;border:1.5px solid var(--lime-dim);box-sizing:border-box;}
   .modal-bg{position:fixed;inset:0;background:#000000aa;display:flex;align-items:flex-end;justify-content:center;z-index:50;}
   @media(min-width:640px){.modal-bg{align-items:center;}}
   .modal{background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:16px 16px 0 0;
@@ -1311,17 +1315,10 @@ function ProjectCard({
           fontWeight: 600,
           color: "var(--text)"
         }
-      }, e.texto), meta > 1 && /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 12,
-          color: "var(--lime)",
-          letterSpacing: 2,
-          marginTop: 2
-        }
-      }, bolinhas)), /*#__PURE__*/React.createElement("div", {
+      }, e.texto)), /*#__PURE__*/React.createElement("div", {
         className: "row",
         style: {
-          gap: 4,
+          gap: 8,
           flex: "none",
           alignItems: "center"
         }
@@ -1334,7 +1331,18 @@ function ProjectCard({
           fontSize: 15,
           padding: "2px 4px"
         }
-      }, "↩"), /*#__PURE__*/React.createElement("span", {
+      }, "↩"), meta > 1 && /*#__PURE__*/React.createElement("div", {
+        className: "row",
+        style: {
+          gap: 5,
+          alignItems: "center"
+        }
+      }, Array.from({
+        length: meta
+      }).map((_, k) => /*#__PURE__*/React.createElement("span", {
+        key: k + "-" + (k < pas ? "on" : "off"),
+        className: "dot " + (k < pas ? "dot-on" : "dot-off")
+      }))), /*#__PURE__*/React.createElement("span", {
         onClick: () => onAvancar(p),
         title: ultima ? "Concluir etapa" : "Registrar passada",
         style: {
@@ -1348,11 +1356,16 @@ function ProjectCard({
           background: "transparent",
           border: "1.5px solid var(--lime-dim)",
           color: "var(--lime)",
+          opacity: 0.85,
           fontSize: 19,
           fontWeight: 700,
           transition: ".15s"
         }
-      }, "")));
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          opacity: 0.35
+        }
+      }, "✓"))));
     }
     return /*#__PURE__*/React.createElement("div", {
       key: e.id,
