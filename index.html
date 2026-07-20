@@ -447,9 +447,11 @@ function ordenarCategorias(nomes) {
 function rowsToProjects(rows) {
   const map = {};
   rows.forEach(r => {
-    const key = r.projeto + "||" + r.tipo;
+    // agrupa por projId estável; se linha legada não tiver projId, cai no nome+tipo
+    const key = r.projId && String(r.projId).trim() ? "pid:" + r.projId : "nm:" + r.projeto + "||" + r.tipo;
     if (!map[key]) {
       map[key] = {
+        projId: r.projId && String(r.projId).trim() ? r.projId : uid(),
         projeto: r.projeto,
         categoria: r.categoria,
         emoji: r.emoji,
@@ -462,14 +464,16 @@ function rowsToProjects(rows) {
     }
     map[key].favorito = map[key].favorito || !!r.favorito;
     if (r.ultimoAvanco > map[key].ultimoAvanco) map[key].ultimoAvanco = r.ultimoAvanco;
-    map[key].etapas.push({
-      id: r.id || uid(),
-      texto: r.etapa,
-      ordem: r.ordem || 0,
-      meta: r.meta || DEFAULT_META,
-      passadas: r.passadas || 0,
-      concluida: !!r.concluida
-    });
+    if (r.etapa && String(r.etapa).trim() !== "") {
+      map[key].etapas.push({
+        id: r.id || uid(),
+        texto: r.etapa,
+        ordem: r.ordem || 0,
+        meta: r.meta || DEFAULT_META,
+        passadas: r.passadas || 0,
+        concluida: !!r.concluida
+      });
+    }
   });
   return Object.values(map).map(p => {
     p.etapas.sort((a, b) => a.ordem - b.ordem);
@@ -479,9 +483,11 @@ function rowsToProjects(rows) {
 function projectsToRows(projects) {
   const rows = [];
   projects.forEach(p => {
+    const projId = p.projId || uid();
     if (!p.etapas.length) {
       rows.push({
         id: uid(),
+        projId,
         categoria: p.categoria,
         projeto: p.projeto,
         emoji: p.emoji,
@@ -489,6 +495,8 @@ function projectsToRows(projects) {
         rotinaFreq: p.rotinaFreq,
         etapa: "",
         ordem: 0,
+        meta: 3,
+        passadas: 0,
         concluida: false,
         favorito: p.favorito,
         ultimoAvanco: p.ultimoAvanco
@@ -498,6 +506,7 @@ function projectsToRows(projects) {
     p.etapas.forEach((e, i) => {
       rows.push({
         id: e.id,
+        projId,
         categoria: p.categoria,
         projeto: p.projeto,
         emoji: p.emoji,
@@ -764,7 +773,7 @@ function App() {
     }));
   }
   function saveEdited(proj, isNew) {
-    if (isNew) setProjects(prev => [...prev, proj]);else setProjects(prev => prev.map(p => p === editing.ref ? proj : p));
+    if (isNew) setProjects(prev => [...prev, proj]);else setProjects(prev => prev.map(p => proj.projId && p.projId === proj.projId || p === editing.ref ? proj : p));
     setEditing(null);
   }
   async function pull() {
@@ -1022,7 +1031,7 @@ function FocusBand({
     const next = p.etapas.find(e => !e.concluida);
     const prog = progressoPassadas(p.etapas);
     return /*#__PURE__*/React.createElement("div", {
-      key: p.projeto + "|" + p.tipo,
+      key: p.projId || p.projeto,
       className: "focus-card fade",
       style: {
         minWidth: 190,
@@ -1181,7 +1190,7 @@ function CategoriaBloco({
       color: "var(--text-3)"
     }
   }, doneEtapas, "/", totalEtapas)), open && projetos.map((p, i) => /*#__PURE__*/React.createElement(ProjectCard, {
-    key: p.projeto + "|" + p.tipo,
+    key: p.projId || p.projeto,
     p: p,
     onAvancar: onAvancar,
     onVoltar: onVoltar,
@@ -1837,6 +1846,7 @@ function EditorModal({
     }] : etapas.filter(e => e.texto.trim());
     const oldEtapas = !isNew && editing.etapas || [];
     return {
+      projId: !isNew && editing.projId ? editing.projId : uid(),
       projeto: projeto.trim() || "Sem nome",
       categoria: catFinal,
       emoji,
