@@ -4,7 +4,14 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>LIFE Dashboard</title>
+<meta name="theme-color" content="#0b0f0c" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="LIFE" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Crect width=%27180%27 height=%27180%27 rx=%2740%27 fill=%27%230b0f0c%27/%3E%3Ctext x=%2790%27 y=%27128%27 font-size=%2796%27 text-anchor=%27middle%27%3E%F0%9F%8C%B1%3C/text%3E%3C/svg%3E" />
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){var icon="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27512%27 height=%27512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27110%27 fill=%27%230b0f0c%27/%3E%3Ctext x=%27256%27 y=%27370%27 font-size=%27300%27 text-anchor=%27middle%27%3E%F0%9F%8C%B1%3C/text%3E%3C/svg%3E";var m={name:"LIFE Dashboard",short_name:"LIFE",start_url:".",display:"standalone",background_color:"#0b0f0c",theme_color:"#0b0f0c",icons:[{src:icon,sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"}]};var b=new Blob([JSON.stringify(m)],{type:"application/manifest+json"});var l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL(b);document.head.appendChild(l);})();</script>
 <style>
   :root{
     --bg:#0b0f0c;
@@ -16,6 +23,8 @@
     --border-strong:#2f3c2f;
     --lime:#7fd858;
     --lime-dim:#5fa840;
+    --done:#6b8f5a;
+    --done-text:#8a9d80;
     --lime-soft:#7fd8581a;
     --sage:#9db8a4;
     --text:#e8f0e6;
@@ -1336,12 +1345,14 @@ function ProjectCard({
           width: 34,
           height: 34,
           borderRadius: 9,
-          background: "var(--lime)",
-          color: "#0b0f0c",
+          background: ultima ? "var(--lime)" : "transparent",
+          border: ultima ? "1px solid var(--lime)" : "1.5px solid var(--lime-dim)",
+          color: ultima ? "#0b0f0c" : "var(--lime)",
           fontSize: 19,
-          fontWeight: 700
+          fontWeight: 700,
+          transition: ".15s"
         }
-      }, "✓")));
+      }, ultima ? "✓" : "")));
     }
     return /*#__PURE__*/React.createElement("div", {
       key: e.id,
@@ -1349,19 +1360,30 @@ function ProjectCard({
       style: {
         gap: 10,
         padding: "5px 0",
-        cursor: "pointer"
+        cursor: "pointer",
+        opacity: e.concluida ? 0.6 : 1
       },
       onClick: () => onToggleEtapa(p, e.id)
     }, /*#__PURE__*/React.createElement("span", {
       style: {
-        color: e.concluida ? "var(--lime)" : "var(--text-3)",
-        fontSize: 15
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 16,
+        height: 16,
+        borderRadius: 4,
+        flex: "none",
+        background: e.concluida ? "var(--done)" : "transparent",
+        border: e.concluida ? "1px solid var(--done)" : "1.5px solid var(--text-3)",
+        color: "#0b0f0c",
+        fontSize: 11,
+        fontWeight: 700
       }
-    }, e.concluida ? "◉" : "○"), /*#__PURE__*/React.createElement("span", {
+    }, e.concluida ? "✓" : ""), /*#__PURE__*/React.createElement("span", {
       style: {
         flex: 1,
         fontSize: 13,
-        color: e.concluida ? "var(--text-3)" : "var(--text-2)",
+        color: e.concluida ? "var(--done-text)" : "var(--text-2)",
         textDecoration: e.concluida ? "line-through" : "none"
       }
     }, e.texto), meta > 1 && !e.concluida && /*#__PURE__*/React.createElement("span", {
